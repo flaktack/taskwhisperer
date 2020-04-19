@@ -166,6 +166,29 @@ var Task = class Task {
 
 
 var TaskService = class TaskService {
+    loadContextFilterAsync(onDataLoaded, onError) {
+		let command = ['task', '_show'];
+		let reader = new SpawnReader.SpawnReader();
+		let config = {};
+
+        reader.spawn('./', command, (lineArray) => {
+				let line = imports.byteArray.toString(lineArray),
+					i = line.indexOf('='),
+					key = line.substr(0, i),
+					value = line.substr(i + 1);
+				config[key] = value;
+            },
+            () => {
+				let currentContext = config['context'];
+				let contextKey = 'context.' + currentContext;
+				if (currentContext && config[contextKey]) {
+					onDataLoaded(config[contextKey]);
+				} else {
+					onDataLoaded('');
+				}
+			});
+	}
+
     loadTaskDataAsync(taskType, projectName, onDataLoaded, onError) {
         let status = "Pending";
 
@@ -178,35 +201,42 @@ var TaskService = class TaskService {
                 break;
         }
 
-        let project = projectName ? "project:" + projectName : "";
+		this.loadContextFilterAsync((contextFilter) => {
+			let project = projectName ? "project:" + projectName : "";
 
-        let command = ['task', 'rc.json.array=on', status, project, 'export'];
-        let reader = new SpawnReader.SpawnReader();
+			let command = [
+				'task',
+				'rc.json.array=on',
+				(contextFilter ? '(' + contextFilter + ') and' : '') + '( ' + status + ' ' + project + ')',
+				'export'
+			];
+			let reader = new SpawnReader.SpawnReader();
 
-        let buffer = "";
+			let buffer = "";
 
-        reader.spawn('./', command, (line) => {
-                buffer = buffer + imports.byteArray.toString(line);
-            },
-            () => {
-                //onComplete
-                let taskListData;
-                try {
-                    taskListData = JSON.parse(buffer);
-                } catch (err) {
-                    onError(err);
-                    return;
-                }
+			reader.spawn('./', command, (line) => {
+					buffer = buffer + imports.byteArray.toString(line);
+				},
+				() => {
+					//onComplete
+					let taskListData;
+					try {
+						taskListData = JSON.parse(buffer);
+					} catch (err) {
+						onError(err);
+						return;
+					}
 
-                let taskList = taskListData.map(function (taskData, index, data) {
-                    return new Task(taskData);
-                });
+					let taskList = taskListData.map(function (taskData, index, data) {
+						return new Task(taskData);
+					});
 
-                onDataLoaded(taskList);
-            });
+					onDataLoaded(taskList);
+				});
+		}, onError);
     }
 
-    loadProjectsDataAsync(taskType, onDataLoaded) {
+    loadProjectsDataAsync(taskType, onDataLoaded, onError) {
         let status = "Pending";
 
         switch (taskType) {
@@ -218,40 +248,46 @@ var TaskService = class TaskService {
                 break;
         }
 
-        let shellProc = Gio.Subprocess.new(['task', status, 'projects'], Gio.SubprocessFlags.STDOUT_PIPE);
+		this.loadContextFilterAsync((contextFilter) => {
+			let shellProc = Gio.Subprocess.new([
+				'task',
+				contextFilter ? '(' + contextFilter + ') and ( ' + status + ')' : status,
+				'projects'
+			], Gio.SubprocessFlags.STDOUT_PIPE);
 
-        shellProc.wait_async(null, function (obj, result) {
-            let shellProcExited = true;
-            shellProc.wait_finish(result);
-            let buffer = "";
-            let stream;
+			shellProc.wait_async(null, function (obj, result) {
+				let shellProcExited = true;
+				shellProc.wait_finish(result);
+				let buffer = "";
+				let stream;
 
-            function readCB(obj, result) {
-                let bytes = stream.read_bytes_finish(result);
+				function readCB(obj, result) {
+					let bytes = stream.read_bytes_finish(result);
 
-                if (!bytes.get_size()) {
-                    let projects = {};
-                    buffer.split("\n").forEach(function (line) {
-                        let values = line.split(" ").filter(value => value);
+					if (!bytes.get_size()) {
+						let projects = {};
+						buffer.split("\n").forEach(function (line) {
+							let values = line.split(" ").filter(value => value);
 
-                        if (values.length !== 2 || isNaN(parseInt(values[1]))) {
-                            return;
-                        }
+							if (values.length !== 2 || isNaN(parseInt(values[1]))) {
+								return;
+							}
 
-                        projects[values[0]] = values[1];
+							projects[values[0]] = values[1];
 
-                    });
+						});
 
-                    onDataLoaded(projects);
-                } else {
-                    buffer = buffer + imports.byteArray.toString(bytes.get_data());
-                    stream.read_bytes_async(8192, 1, null, readCB);
-                }
-            }
+						onDataLoaded(projects);
+					} else {
+						buffer = buffer + imports.byteArray.toString(bytes.get_data());
+						stream.read_bytes_async(8192, 1, null, readCB);
+					}
+				}
 
-            stream = shellProc.get_stdout_pipe();
-            stream.read_bytes_async(8192, 1, null, readCB);
-        });
+				stream = shellProc.get_stdout_pipe();
+				stream.read_bytes_async(8192, 1, null, readCB);
+			});
+		}, onError);
     }
 
     setTaskDone(taskID, cb) {
