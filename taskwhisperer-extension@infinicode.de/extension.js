@@ -42,7 +42,7 @@ const Shell = imports.gi.Shell;
 const ShellEntry = imports.ui.shellEntry;
 const Util = imports.misc.util;
 
-const Gettext = imports.gettext.domain('gnome-shell-extension-taskwhisperer');
+const Gettext = imports.gettext.domain(Me.uuid);
 const _ = Gettext.gettext;
 const ngettext = Gettext.ngettext;
 
@@ -710,7 +710,7 @@ let TaskWhispererMenuButton = GObject.registerClass(class TaskWhispererMenuButto
 
     _init() {
         this._icon = new St.Icon({
-            gicon: Gio.icon_new_for_string(Me.dir.get_child('icons').get_path() + "/taskwarrior_head.svg"),
+            gicon: Gio.icon_new_for_string(Me.dir.get_child("taskwarrior_head.svg").get_path()),
             style_class: 'system-status-icon'
         });
 
@@ -1010,7 +1010,7 @@ let TaskWhispererMenuButton = GObject.registerClass(class TaskWhispererMenuButto
 var taskWhispererMenu;
 
 function init(extensionMeta) {
-    Convenience.initTranslations('gnome-shell-extension-taskwhisperer');
+    Convenience.initTranslations(Me.uuid);
     // let theme = imports.gi.Gtk.IconTheme.get_default();
     // theme.append_search_path(extensionMeta.path + "/icons");
 }

@@ -66,7 +66,7 @@ function createActionButton(iconName, accessibleName, classes, onClick) {
 
 function getCustomIcon(iconName) {
     return new St.Icon({
-        gicon: Gio.icon_new_for_string(Me.dir.get_child('icons').get_path() + "/" + iconName + ".svg")
+        gicon: Gio.icon_new_for_string(Me.dir.get_child(iconName + ".svg").get_path())
     });
 }
 
